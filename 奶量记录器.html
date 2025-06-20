@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新生儿奶量记录</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .summary {
+            margin-top: 30px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .delete-btn {
+            background-color: #f44336;
+            width: auto;
+            padding: 5px 10px;
+        }
+        .delete-btn:hover {
+            background-color: #d32f2f;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            display: block;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>新生儿奶量记录</h1>
+    
+    <div class="form-group">
+        <h2>添加喂奶记录</h2>
+        <div id="message" class="message"></div>
+        
+        <label for="date">日期</label>
+        <input type="date" id="date" required>
+        
+        <label for="time">时间</label>
+        <input type="time" id="time" required>
+        
+        <label for="amount">奶量 (毫升)</label>
+        <input type="number" id="amount" min="1" required>
+        
+        <label for="notes">备注 (可选)</label>
+        <input type="text" id="notes" placeholder="如: 母乳/配方奶">
+        
+        <button id="addBtn">添加记录</button>
+    </div>
+    
+    <div class="form-group">
+        <h2>今日记录</h2>
+        <div id="todayRecords"></div>
+    </div>
+    
+    <div class="form-group">
+        <h2>所有记录</h2>
+        <div id="allRecords"></div>
+    </div>
+    
+    <div class="summary">
+        <h2>每日汇总</h2>
+        <div id="dailySummary"></div>
+    </div>
+
+    <script>
+        // 从本地存储加载数据
+        let records = JSON.parse(localStorage.getItem('babyFeedingRecords')) || [];
+        
+        // 显示消息
+        function showMessage(type, text) {
+            const messageEl = document.getElementById('message');
+            messageEl.className = 'message ' + type;
+            messageEl.textContent = text;
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+        
+        // 初始化表单默认值
+        function initFormDefaults() {
+            const now = new Date();
+            const today = now.toISOString().split('T')[0];
+            const time = now.getHours().toString().padStart(2, '0') + ':' + 
+                         now.getMinutes().toString().padStart(2, '0');
+            
+            document.getElementById('date').value = today;
+            document.getElementById('time').value = time;
+        }
+        
+        // 添加记录
+        function addRecord() {
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            const amount = document.getElementById('amount').value;
+            const notes = document.getElementById('notes').value;
+            
+            // 验证输入
+            if (!date || !time || !amount) {
+                showMessage('error', '请填写日期、时间和奶量');
+                return;
+            }
+            
+            if (isNaN(amount) {
+                showMessage('error', '奶量必须是数字');
+                return;
+            }
+            
+            const record = {
+                id: Date.now(),
+                date: date,
+                time: time,
+                amount: parseInt(amount),
+                notes: notes || '无备注'
+            };
+            
+            records.push(record);
+            saveRecords();
+            
+            // 清空表单
+            document.getElementById('amount').value = '';
+            document.getElementById('notes').value = '';
+            
+            // 更新显示
+            renderTodayRecords();
+            renderAllRecords();
+            renderDailySummary();
+            
+            showMessage('success', '记录添加成功');
+        }
+        
+        // 删除记录
+        function deleteRecord(id) {
+            if (confirm('确定要删除这条记录吗？')) {
+                records = records.filter(record => record.id !== id);
+                saveRecords();
+                renderTodayRecords();
+                renderAllRecords();
+                renderDailySummary();
+                showMessage('success', '记录已删除');
+            }
+        }
+        
+        // 保存到本地存储
+        function saveRecords() {
+            localStorage.setItem('babyFeedingRecords', JSON.stringify(records));
+        }
+        
+        // 渲染今日记录
+        function renderTodayRecords() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayRecords = records.filter(record => record.date === today);
+            
+            let html = '<table>';
+            html += '<tr><th>时间</th><th>奶量(ml)</th><th>备注</th><th>操作</th></tr>';
+            
+            if (todayRecords.length === 0) {
+                html += '<tr><td colspan="4">今日暂无记录</td></tr>';
+            } else {
+                todayRecords.forEach(record => {
+                    html += `
+                        <tr>
+                            <td>${record.time}</td>
+                            <td>${record.amount}</td>
+                            <td>${record.notes}</td>
+                            <td><button class="delete-btn" onclick="deleteRecord(${record.id})">删除</button></td>
+                        </tr>
+                    `;
+                });
+                
+                // 计算今日总量
+                const todayTotal = todayRecords.reduce((sum, record) => sum + record.amount, 0);
+                html += `
+                    <tr style="font-weight: bold;">
+                        <td>总计</td>
+                        <td>${todayTotal} ml</td>
+                        <td colspan="2"></td>
+                    </tr>
+                `;
+            }
+            
+            html += '</table>';
+            document.getElementById('todayRecords').innerHTML = html;
+        }
+        
+        // 渲染所有记录
+        function renderAllRecords() {
+            let html = '<table>';
+            html += '<tr><th>日期</th><th>时间</th><th>奶量(ml)</th><th>备注</th><th>操作</th></tr>';
+            
+            if (records.length === 0) {
+                html += '<tr><td colspan="5">暂无记录</td></tr>';
+            } else {
+                // 按日期和时间排序
+                const sortedRecords = [...records].sort((a, b) => {
+                    if (a.date === b.date) {
+                        return a.time.localeCompare(b.time);
+                    }
+                    return b.date.localeCompare(a.date);
+                });
+                
+                sortedRecords.forEach(record => {
+                    html += `
+                        <tr>
+                            <td>${formatDate(record.date)}</td>
+                            <td>${record.time}</td>
+                            <td>${record.amount}</td>
+                            <td>${record.notes}</td>
+                            <td><button class="delete-btn" onclick="deleteRecord(${record.id})">删除</button></td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            html += '</table>';
+            document.getElementById('allRecords').innerHTML = html;
+        }
+        
+        // 渲染每日汇总
+        function renderDailySummary() {
+            // 按日期分组并计算总量
+            const dailySummary = {};
+            records.forEach(record => {
+                if (!dailySummary[record.date]) {
+                    dailySummary[record.date] = 0;
+                }
+                dailySummary[record.date] += record.amount;
+            });
+            
+            // 转换为数组并排序
+            const summaryArray = Object.entries(dailySummary)
+                .map(([date, total]) => ({ date, total }))
+                .sort((a, b) => b.date.localeCompare(a.date));
+            
+            let html = '<table>';
+            html += '<tr><th>日期</th><th>总奶量(ml)</th></tr>';
+            
+            if (summaryArray.length === 0) {
+                html += '<tr><td colspan="2">暂无数据</td></tr>';
+            } else {
+                summaryArray.forEach(item => {
+                    html += `
+                        <tr>
+                            <td>${formatDate(item.date)}</td>
+                            <td>${item.total} ml</td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            html += '</table>';
+            document.getElementById('dailySummary').innerHTML = html;
+        }
+        
+        // 格式化日期显示 (YYYY-MM-DD -> MM/DD)
+        function formatDate(dateStr) {
+            const [year, month, day] = dateStr.split('-');
+            return `${month}/${day}`;
+        }
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            initFormDefaults();
+            renderTodayRecords();
+            renderAllRecords();
+            renderDailySummary();
+            
+            // 添加事件监听
+            document.getElementById('addBtn').addEventListener('click', addRecord);
+        });
+        
+        // 使deleteRecord函数在全局可用
+        window.deleteRecord = deleteRecord;
+    </script>
+</body>
+</html>
