@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宝宝奶量记录</title>
+    <style>
+        /* 基础样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .date-display {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #64748b;
+        }
+        
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #475569;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        input[type="time"], input[type="number"] {
+            padding: 12px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        
+        /* 记录列表样式 */
+        .record-list {
+            margin-top: 20px;
+        }
+        
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 10px;
+            background-color: #f8fafc;
+            border-radius: 6px;
+            border-left: 4px solid #2563eb;
+            transition: transform 0.2s;
+        }
+        
+        .record-item:hover {
+            transform: translateX(5px);
+        }
+        
+        .record-time {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .record-amount {
+            font-weight: 500;
+            color: #0f172a;
+        }
+        
+        .delete-btn {
+            background-color: #ef4444;
+            width: auto;
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+        
+        .delete-btn:hover {
+            background-color: #dc2626;
+        }
+        
+        /* 汇总样式 */
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ecfdf5;
+            border-left: 4px solid #10b981;
+            border-radius: 6px;
+        }
+        
+        .summary-title {
+            font-weight: 600;
+            color: #065f46;
+            margin-bottom: 5px;
+        }
+        
+        .summary-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #065f46;
+        }
+        
+        .empty-message {
+            text-align: center;
+            color: #94a3b8;
+            padding: 15px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>宝宝奶量记录</h1>
+        <div class="date-display" id="currentDate"></div>
+        
+        <form id="milkRecordForm">
+            <div class="form-group">
+                <label for="time">喂奶时间</label>
+                <input type="time" id="time" required>
+            </div>
+            <div class="form-group">
+                <label for="amount">奶量（毫升）</label>
+                <input type="number" id="amount" min="0" placeholder="输入奶量" required>
+            </div>
+            <button type="submit">添加记录</button>
+        </form>
+        
+        <div class="record-list">
+            <h2 style="margin-top: 20px; color: #475569;">今日喂奶记录</h2>
+            <div id="recordsContainer">
+                <div class="empty-message" id="emptyMessage">暂无喂奶记录，点击添加第一条记录吧</div>
+            </div>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-title">今日总奶量</div>
+            <div class="summary-amount" id="totalAmount">0 毫升</div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const form = document.getElementById('milkRecordForm');
+        const timeInput = document.getElementById('time');
+        const amountInput = document.getElementById('amount');
+        const recordsContainer = document.getElementById('recordsContainer');
+        const emptyMessage = document.getElementById('emptyMessage');
+        const totalAmountElement = document.getElementById('totalAmount');
+        const currentDateElement = document.getElementById('currentDate');
+        
+        // 设置当前日期
+        function setCurrentDate() {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            currentDateElement.textContent = `${year}年${month}月${day}日`;
+        }
+        
+        // 从localStorage获取当天的记录
+        function getTodayRecords() {
+            const date = new Date();
+            const key = `milkRecords_${date.toDateString()}`;
+            const records = localStorage.getItem(key);
+            return records ? JSON.parse(records) : [];
+        }
+        
+        // 保存记录到localStorage
+        function saveRecords(records) {
+            const date = new Date();
+            const key = `milkRecords_${date.toDateString()}`;
+            localStorage.setItem(key, JSON.stringify(records));
+        }
+        
+        // 渲染记录列表
+        function renderRecords() {
+            const records = getTodayRecords();
+            recordsContainer.innerHTML = '';
+            
+            if (records.length === 0) {
+                recordsContainer.appendChild(emptyMessage);
+            } else {
+                records.forEach((record, index) => {
+                    const recordItem = document.createElement('div');
+                    recordItem.className = 'record-item';
+                    
+                    recordItem.innerHTML = `
+                        <div class="record-time">${record.time}</div>
+                        <div class="record-amount">${record.amount} 毫升</div>
+                        <button class="delete-btn" data-index="${index}">删除</button>
+                    `;
+                    
+                    recordsContainer.appendChild(recordItem);
+                });
+                
+                // 添加删除事件监听
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        if (confirm('确定要删除这条记录吗？')) {
+                            deleteRecord(index);
+                        }
+                    });
+                });
+            }
+            
+            // 更新总奶量
+            updateTotalAmount();
+        }
+        
+        // 删除记录
+        function deleteRecord(index) {
+            let records = getTodayRecords();
+            records.splice(index, 1);
+            saveRecords(records);
+            renderRecords();
+        }
+        
+        // 更新总奶量
+        function updateTotalAmount() {
+            const records = getTodayRecords();
+            const total = records.reduce((sum, record) => sum + record.amount, 0);
+            totalAmountElement.textContent = `${total} 毫升`;
+        }
+        
+        // 表单提交事件
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const time = timeInput.value;
+            const amount = parseInt(amountInput.value);
+            
+            if (time && amount > 0) {
+                let records = getTodayRecords();
+                records.push({ time, amount });
+                saveRecords(records);
+                renderRecords();
+                
+                // 清空表单
+                timeInput.value = '';
+                amountInput.value = '';
+            }
+        });
+        
+        // 初始化
+        setCurrentDate();
+        renderRecords();
+    </script>
+</body>
+</html>
